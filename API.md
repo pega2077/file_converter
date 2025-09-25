@@ -59,7 +59,7 @@ POST /convert
 Content-Type: application/json
 ```
 
-Registers a conversion job for Pandoc to execute. The service schedules the work asynchronously and immediately returns task metadata. The `sourcePath` must be the relative path returned by the upload endpoint (e.g., `uploads/<filename>`).
+Registers a conversion job for Pandoc to execute. The service schedules the work asynchronously and immediately returns task metadata. The `sourcePath` must be the relative path returned by the upload endpoint (e.g., `uploads/<filename>`). When `sourceFormat` is `pdf`, the service extracts text content with `unpdf`, writes an intermediate Markdown file, and then invokes Pandoc using that Markdown as input.
 
 **Request Body**
 

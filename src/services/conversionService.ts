@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { extractText } from 'unpdf';
 
 import { ConversionTask } from '../types/task';
 import { CreateTaskPayload, TaskManager } from './taskManager';
@@ -20,6 +21,12 @@ export interface ConversionServiceOptions {
 }
 
 const DEFAULT_PANDOC_PATH = process.env.PANDOC_PATH || 'pandoc';
+
+interface PreparedSource {
+  sourcePath: string;
+  sourceFormat: string;
+  cleanup: () => Promise<void>;
+}
 
 export class ConversionService {
   private readonly outputDirectory: string;
@@ -58,10 +65,19 @@ export class ConversionService {
     const outputPath = path.join(this.outputDirectory, outputFilename);
 
     try {
-      if (process.env.NODE_ENV === 'test') {
-        await this.simulateConversion(task.sourcePath, outputPath);
-      } else {
-        await this.runPandoc(task, outputPath);
+      const useSimulation = process.env.NODE_ENV === 'test';
+      const preparation = useSimulation
+        ? this.prepareSimulationSource(task)
+        : await this.prepareSourceForPandoc(task);
+
+      try {
+        if (useSimulation) {
+          await this.simulateConversion(task.sourcePath, outputPath);
+        } else {
+          await this.runPandoc(task, outputPath, preparation.sourcePath, preparation.sourceFormat);
+        }
+      } finally {
+        await preparation.cleanup();
       }
 
       this.taskManager.attachResult(task.id, outputPath);
@@ -69,6 +85,48 @@ export class ConversionService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.taskManager.attachError(task.id, errorMessage);
     }
+  }
+
+  private prepareSimulationSource(task: ConversionTask): PreparedSource {
+    return {
+      sourcePath: task.sourcePath,
+      sourceFormat: task.sourceFormat,
+      cleanup: async () => {}
+    };
+  }
+
+  private async prepareSourceForPandoc(task: ConversionTask): Promise<PreparedSource> {
+    if (task.sourceFormat.toLowerCase() !== 'pdf') {
+      return {
+        sourcePath: task.sourcePath,
+        sourceFormat: task.sourceFormat,
+        cleanup: async () => {}
+      };
+    }
+
+    const intermediatePath = this.buildIntermediateMarkdownPath(task.sourceFilename, task.id);
+    await this.convertPdfToMarkdown(task.sourcePath, intermediatePath);
+
+    return {
+      sourcePath: intermediatePath,
+      sourceFormat: 'markdown',
+      cleanup: async () => {
+        await fs.promises.unlink(intermediatePath).catch(() => undefined);
+      }
+    };
+  }
+
+  private buildIntermediateMarkdownPath(originalFilename: string, taskId: string): string {
+    const parsed = path.parse(originalFilename);
+    return path.join(this.outputDirectory, `${parsed.name}-${taskId}-intermediate.md`);
+  }
+
+  private async convertPdfToMarkdown(inputPath: string, outputPath: string): Promise<void> {
+  const pdfBuffer: Buffer = await fs.promises.readFile(inputPath);
+  const binaryData = new Uint8Array(pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength));
+  const { text } = await extractText(binaryData, { mergePages: true });
+  const markdownContent = Array.isArray(text) ? text.join('\n\n') : text;
+    await fs.promises.writeFile(outputPath, markdownContent, 'utf8');
   }
 
   private buildOutputFilename(originalFilename: string, taskId: string, targetFormat: string): string {
@@ -88,13 +146,13 @@ export class ConversionService {
     });
   }
 
-  private runPandoc(task: ConversionTask, outputPath: string): Promise<void> {
+  private runPandoc(task: ConversionTask, outputPath: string, sourcePath: string, sourceFormat: string): Promise<void> {
     const args = [
       '--from',
-      task.sourceFormat,
+      sourceFormat,
       '--to',
       task.targetFormat,
-      task.sourcePath,
+      sourcePath,
       '--output',
       outputPath
     ];

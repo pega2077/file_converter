@@ -141,3 +141,4 @@ npm test
 
 - Tasks are maintained in memory. Restarting the server clears the task registry.
 - Extend the `ConversionService` to persist tasks or integrate a job queue for production workloads.
+- When `sourceFormat` is `pdf`, the service extracts text content via `unpdf` and feeds it to Pandoc as Markdown before creating the requested output.
