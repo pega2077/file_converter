@@ -23,7 +23,8 @@ export async function createApp(): Promise<AppContext> {
     outputDirectory: CONVERTED_DIR,
     pandocPath: process.env.PANDOC_PATH
   });
-
+  console.log(`Using output directory: ${CONVERTED_DIR}`);
+  console.log(`Using Pandoc executable at: ${conversionService['pandocPath']}`);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 

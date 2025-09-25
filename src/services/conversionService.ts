@@ -165,7 +165,13 @@ export class ConversionService {
         stderr += data.toString();
       });
 
-      pandoc.on('error', (err: Error) => {
+      pandoc.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') {
+          console.error(`Pandoc executable not found at "${this.pandocPath}".`);
+          reject(new Error(`Failed to launch Pandoc at "${this.pandocPath}". Ensure Pandoc is installed on the server and the executable path is reachable (set PANDOC_PATH if necessary).`));
+          return;
+        }
+
         reject(err);
       });
 

@@ -142,3 +142,9 @@ npm test
 - Tasks are maintained in memory. Restarting the server clears the task registry.
 - Extend the `ConversionService` to persist tasks or integrate a job queue for production workloads.
 - When `sourceFormat` is `pdf`, the service extracts text content via `unpdf` and feeds it to Pandoc as Markdown before creating the requested output.
+
+### Deployment checklist
+
+- **Install Pandoc on the target machine.** The service shells out to the `pandoc` executable for every conversion.
+- **Set the `PANDOC_PATH` environment variable** if Pandoc is not on the default `PATH`. You can add it to the `.env` file or configure it at the process level.
+- **Verify availability** by running `pandoc --version` (or the full path you configure) on the server before starting the Node.js process. The service will raise a clear error if it cannot spawn the executable.
