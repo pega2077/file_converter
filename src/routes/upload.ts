@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
-import { UPLOADS_DIR } from '../config/storage';
+import { STORAGE_ROOT, UPLOADS_DIR } from '../config/storage';
 
 const storage = multer.diskStorage({
   destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
@@ -25,7 +25,7 @@ uploadRouter.post('/', upload.single('file'), (req: Request, res: Response) => {
     return res.status(400).json({ message: 'No file uploaded.' });
   }
 
-  const filePath = req.file.path.replace(/\\/g, '/');
+  const relativePath = path.relative(STORAGE_ROOT, req.file.path).replace(/\\/g, '/');
 
   return res.status(201).json({
     message: 'File uploaded successfully.',
@@ -34,7 +34,7 @@ uploadRouter.post('/', upload.single('file'), (req: Request, res: Response) => {
       storedName: req.file.filename,
       mimeType: req.file.mimetype,
       size: req.file.size,
-      path: filePath
+      path: relativePath
     }
   });
 });

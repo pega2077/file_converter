@@ -3,6 +3,7 @@ export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export interface ConversionTask {
   id: string;
   sourcePath: string;
+  sourceRelativePath: string;
   sourceFormat: string;
   targetFormat: string;
   sourceFilename: string;

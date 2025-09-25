@@ -2,7 +2,7 @@
 
 This document describes the HTTP endpoints exposed by the file converter service. The service accepts document uploads, submits background conversion jobs powered by Pandoc, and allows clients to poll for completion and download the converted result.
 
-- **Base URL (default)**: `http://localhost:3000`
+- **Base URL (default)**: `http://localhost:3100`
 - **Dependencies**: Pandoc must be installed and accessible on the host machine (via `PANDOC_PATH` or `PATH`).
 
 ## Authentication
@@ -33,7 +33,7 @@ Uploads a single file that will later be converted. The file is stored under `st
 **Sample Request**
 
 ```bash
-curl -X POST http://localhost:3000/upload \
+curl -X POST http://localhost:3100/upload \
   -F "file=@/absolute/path/to/sample.md"
 ```
 
@@ -47,7 +47,7 @@ curl -X POST http://localhost:3000/upload \
     "storedName": "1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md",
     "mimeType": "text/markdown",
     "size": 128,
-  "path": "D:/Projects/file_converter/storage/uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md"
+    "path": "uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md"
   }
 }
 ```
@@ -59,13 +59,13 @@ POST /convert
 Content-Type: application/json
 ```
 
-Registers a conversion job for Pandoc to execute. The service schedules the work asynchronously and immediately returns task metadata.
+Registers a conversion job for Pandoc to execute. The service schedules the work asynchronously and immediately returns task metadata. The `sourcePath` must be the relative path returned by the upload endpoint (e.g., `uploads/<filename>`).
 
 **Request Body**
 
 | Field           | Type   | Required | Description                                                                 |
 |-----------------|--------|----------|-----------------------------------------------------------------------------|
-| `sourcePath`    | string | ✅        | Absolute path to the source file (e.g., `file.path` returned from `/upload`).|
+| `sourcePath`    | string | ✅        | Relative path under `storage/` (e.g., `uploads/<filename>` from `/upload`). |
 | `sourceFormat`  | string | ✅        | Pandoc input format (e.g., `markdown`, `docx`, `html`).                     |
 | `targetFormat`  | string | ✅        | Pandoc output format (e.g., `pdf`, `html`, `docx`).                         |
 | `sourceFilename`| string | ❌        | Optional override for the original filename shown in task metadata.         |
@@ -73,10 +73,10 @@ Registers a conversion job for Pandoc to execute. The service schedules the work
 **Sample Request**
 
 ```bash
-curl -X POST http://localhost:3000/convert \
+curl -X POST http://localhost:3100/convert \
   -H "Content-Type: application/json" \
   -d '{
-  "sourcePath": "D:/Projects/file_converter/storage/uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md",
+        "sourcePath": "uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md",
         "sourceFormat": "markdown",
         "targetFormat": "html"
       }'
@@ -89,7 +89,7 @@ curl -X POST http://localhost:3000/convert \
   "message": "Conversion task created successfully.",
   "task": {
     "id": "1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2",
-  "sourcePath": "D:/Projects/file_converter/storage/uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md",
+    "sourcePath": "uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md",
     "sourceFormat": "markdown",
     "targetFormat": "html",
     "sourceFilename": "sample.md",
@@ -111,7 +111,7 @@ Retrieves the latest state of a conversion task. When `status` becomes `complete
 **Sample Request**
 
 ```bash
-curl http://localhost:3000/tasks/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
+curl http://localhost:3100/tasks/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
 ```
 
 **Successful Response (200)**
@@ -121,7 +121,7 @@ curl http://localhost:3000/tasks/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
   "task": {
     "id": "1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2",
     "status": "completed",
-    "sourcePath": "D:/Projects/file_converter/uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md",
+    "sourcePath": "uploads/1695662550000-2f5aa3a8-85f4-46ce-8b36-6f14eac823b5.md",
     "sourceFormat": "markdown",
     "targetFormat": "html",
     "sourceFilename": "sample.md",
@@ -129,7 +129,7 @@ curl http://localhost:3000/tasks/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
     "error": null,
     "createdAt": "2025-09-25T08:00:00.000Z",
     "updatedAt": "2025-09-25T08:00:10.000Z",
-  "downloadUrl": "http://localhost:3000/download/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2"
+  "downloadUrl": "http://localhost:3100/download/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2"
   }
 }
 ```
@@ -149,7 +149,7 @@ Streams the converted file associated with the given task ID. Returns HTTP 409 i
 **Sample Request**
 
 ```bash
-curl -L -o sample.html http://localhost:3000/download/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
+curl -L -o sample.html http://localhost:3100/download/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
 ```
 
 ### 5. Health Check *(optional)*
@@ -176,7 +176,7 @@ Returns service liveness information.
 - **PowerShell**: the JSON examples above work as-is because single quotes wrap the payload.
 - **Command Prompt (`cmd.exe`)**: escape double quotes inside the `-d` argument, e.g.,
   ```cmd
-  curl -X POST http://localhost:3000/convert -H "Content-Type: application/json" -d "{\"sourcePath\":\"C:/path/to/file.md\",\"sourceFormat\":\"markdown\",\"targetFormat\":\"html\"}"
+  curl -X POST http://localhost:3100/convert -H "Content-Type: application/json" -d "{\"sourcePath\":\"C:/path/to/file.md\",\"sourceFormat\":\"markdown\",\"targetFormat\":\"html\"}"
   ```
 
 ## Notes

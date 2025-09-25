@@ -4,7 +4,7 @@ import request from 'supertest';
 import type { Application } from 'express';
 
 import { createApp } from '../src/app';
-import { CONVERTED_DIR, UPLOADS_DIR } from '../src/config/storage';
+import { CONVERTED_DIR, STORAGE_ROOT, UPLOADS_DIR } from '../src/config/storage';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -49,8 +49,9 @@ describe('File Converter Service', () => {
     expect(response.body.file.originalName).toBe('sample.md');
     expect(response.body.file.mimeType).toBeTruthy();
 
-    const savedPath = response.body.file.path as string;
-    expect(fs.existsSync(savedPath)).toBe(true);
+  const savedRelativePath = response.body.file.path as string;
+  const savedAbsolutePath = path.resolve(STORAGE_ROOT, savedRelativePath);
+  expect(fs.existsSync(savedAbsolutePath)).toBe(true);
   });
 
   it('creates and completes a conversion task', async () => {
@@ -58,12 +59,12 @@ describe('File Converter Service', () => {
       .post('/upload')
       .attach('file', Buffer.from('# Title'), 'sample.md');
 
-    const sourcePath = path.resolve(uploadResponse.body.file.path as string);
+    const sourceRelativePath = uploadResponse.body.file.path as string;
 
     const convertResponse = await request(app)
       .post('/convert')
       .send({
-        sourcePath,
+        sourcePath: sourceRelativePath,
         sourceFormat: 'markdown',
         targetFormat: 'html'
       });

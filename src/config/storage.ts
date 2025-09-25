@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 const ROOT = process.cwd();
-const STORAGE_ROOT = path.resolve(ROOT, 'storage');
+export const STORAGE_ROOT = path.resolve(ROOT, 'storage');
 
 export const UPLOADS_DIR = path.join(STORAGE_ROOT, 'uploads');
 export const CONVERTED_DIR = path.join(STORAGE_ROOT, 'converted');

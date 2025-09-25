@@ -48,20 +48,20 @@ curl -F "file=@document.md" http://localhost:3000/upload
     "storedName": "1695662550000-1234abcd.md",
     "mimeType": "text/markdown",
     "size": 128,
-  "path": "d:/Projects/file_converter/storage/uploads/1695662550000-1234abcd.md"
+    "path": "uploads/1695662550000-1234abcd.md"
   }
 }
 ```
 
 ### `POST /convert`
 
-Submit a conversion task. The `sourcePath` should point to a file accessible by the service (e.g., the path returned from `/upload`).
+Submit a conversion task. The `sourcePath` must be the relative path provided by `/upload` (e.g., `uploads/<filename>`); the service resolves it within the `storage/` directory.
 
 ```bash
 curl -X POST http://localhost:3000/convert \
   -H "Content-Type: application/json" \
   -d '{
-  "sourcePath": "d:/Projects/file_converter/storage/uploads/1695662550000-1234abcd.md",
+        "sourcePath": "uploads/1695662550000-1234abcd.md",
         "sourceFormat": "markdown",
         "targetFormat": "html"
       }'
@@ -96,7 +96,7 @@ curl http://localhost:3000/tasks/a1b2c3d4
   "task": {
     "id": "a1b2c3d4",
     "status": "completed",
-  "downloadUrl": "http://localhost:3000/download/a1b2c3d4",
+    "downloadUrl": "http://localhost:3000/download/a1b2c3d4",
     "outputPath": "document-a1b2c3d4.html",
     "updatedAt": "2024-09-25T12:00:10.000Z"
   }

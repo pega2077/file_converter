@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { ConversionService } from '../services/conversionService';
+import { STORAGE_ROOT } from '../config/storage';
 
 interface ConvertRequestBody {
   sourcePath: string;
@@ -23,28 +24,50 @@ export function createConversionRouter(conversionService: ConversionService): ex
       });
     }
 
-    const normalizedSourcePath = path.isAbsolute(sourcePath)
-      ? sourcePath
-      : path.resolve(sourcePath);
+    if (path.isAbsolute(sourcePath)) {
+      return res.status(400).json({
+        message: 'sourcePath must be a path relative to the storage directory.'
+      });
+    }
 
-    if (!fs.existsSync(normalizedSourcePath)) {
+    const normalizedRelativePath = path.normalize(sourcePath).replace(/\\/g, '/');
+    const absoluteSourcePath = path.resolve(STORAGE_ROOT, normalizedRelativePath);
+    const safeRelativePath = path.relative(STORAGE_ROOT, absoluteSourcePath);
+
+    if (safeRelativePath.startsWith('..') || path.isAbsolute(safeRelativePath)) {
+      return res.status(400).json({
+        message: 'sourcePath must resolve within the storage directory.'
+      });
+    }
+
+    if (!fs.existsSync(absoluteSourcePath)) {
       return res.status(404).json({
         message: 'Source file not found.',
-        sourcePath: normalizedSourcePath
+        sourcePath
       });
     }
 
     try {
       const task = await conversionService.createConversionTask({
-        sourcePath: normalizedSourcePath,
+        sourceAbsolutePath: absoluteSourcePath,
+        sourceRelativePath: safeRelativePath.replace(/\\/g, '/'),
         sourceFormat,
         targetFormat,
-        sourceFilename: sourceFilename ?? path.basename(normalizedSourcePath)
+        sourceFilename: sourceFilename ?? path.basename(absoluteSourcePath)
       });
 
       return res.status(202).json({
         message: 'Conversion task created successfully.',
-        task
+        task: {
+          id: task.id,
+          status: task.status,
+          sourcePath: task.sourceRelativePath,
+          sourceFormat: task.sourceFormat,
+          targetFormat: task.targetFormat,
+          sourceFilename: task.sourceFilename,
+          createdAt: task.createdAt,
+          updatedAt: task.updatedAt
+        }
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown conversion error.';

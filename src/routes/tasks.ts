@@ -27,7 +27,7 @@ export function createTaskRouter(taskManager: TaskManager): express.Router {
       task: {
         id: task.id,
         status: task.status,
-        sourcePath: task.sourcePath,
+        sourcePath: task.sourceRelativePath,
         sourceFormat: task.sourceFormat,
         targetFormat: task.targetFormat,
         sourceFilename: task.sourceFilename,

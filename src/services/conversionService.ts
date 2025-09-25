@@ -7,7 +7,8 @@ import { ConversionTask } from '../types/task';
 import { CreateTaskPayload, TaskManager } from './taskManager';
 
 export interface ConversionRequest {
-  sourcePath: string;
+  sourceAbsolutePath: string;
+  sourceRelativePath: string;
   sourceFormat: string;
   targetFormat: string;
   sourceFilename: string;
@@ -38,8 +39,12 @@ export class ConversionService {
 
     const taskId = this.generateTaskId();
     const task = this.taskManager.createTask({
-      ...request,
-      id: taskId
+      id: taskId,
+      sourcePath: request.sourceAbsolutePath,
+      sourceRelativePath: request.sourceRelativePath,
+      sourceFormat: request.sourceFormat,
+      targetFormat: request.targetFormat,
+      sourceFilename: request.sourceFilename
     } satisfies CreateTaskPayload);
 
     void this.processTask(task);

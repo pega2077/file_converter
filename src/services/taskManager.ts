@@ -3,6 +3,7 @@ import { ConversionTask, TaskStatus } from '../types/task';
 export interface CreateTaskPayload {
   id: string;
   sourcePath: string;
+  sourceRelativePath: string;
   sourceFormat: string;
   targetFormat: string;
   sourceFilename: string;
