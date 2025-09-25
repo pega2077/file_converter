@@ -1,0 +1,42 @@
+import express, { type Request, type Response } from 'express';
+
+import { CONVERTED_DIR, ensureStorageDirectories } from './config/storage';
+import { createConversionRouter } from './routes/conversion';
+import { createDownloadRouter } from './routes/download';
+import { createTaskRouter } from './routes/tasks';
+import { uploadRouter } from './routes/upload';
+import { ConversionService } from './services/conversionService';
+import { TaskManager } from './services/taskManager';
+
+export interface AppContext {
+  app: express.Express;
+  conversionService: ConversionService;
+  taskManager: TaskManager;
+}
+
+export async function createApp(): Promise<AppContext> {
+  await ensureStorageDirectories();
+
+  const app = express();
+  const taskManager = new TaskManager();
+  const conversionService = new ConversionService(taskManager, {
+    outputDirectory: CONVERTED_DIR,
+    pandocPath: process.env.PANDOC_PATH
+  });
+
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  app.use('/downloads', express.static(CONVERTED_DIR));
+
+  app.use('/upload', uploadRouter);
+  app.use('/convert', createConversionRouter(conversionService));
+  app.use('/tasks', createTaskRouter(taskManager));
+  app.use('/download', createDownloadRouter(taskManager));
+
+  app.get('/health', (_req: Request, res: Response) => {
+    res.json({ status: 'ok' });
+  });
+
+  return { app, conversionService, taskManager };
+}

@@ -1,0 +1,143 @@
+# File Converter Service
+
+A lightweight file conversion service built with Node.js, TypeScript, and Express. It orchestrates document conversions by invoking [Pandoc](https://pandoc.org/) via the command line and exposes three primary endpoints.
+
+## Features
+
+- **File upload** (`POST /upload`) – Accepts a multipart form upload (`file` field) and stores the file in `storage/uploads/`.
+- **Conversion task creation** (`POST /convert`) – Submits a conversion job using Pandoc given a source file path, source format, and target format.
+- **Task status lookup** (`GET /tasks/:id`) – Retrieves task metadata, including status, timestamps, and a download URL when the conversion succeeds.
+- **Task download** (`GET /download/:id`) – Streams the converted asset directly using the task ID once processing has finished.
+
+## Prerequisites
+
+- Node.js 18 or later.
+- Pandoc installed locally and accessible via the `PANDOC_PATH` environment variable (defaults to `pandoc` on the system `PATH`).
+
+## Getting Started
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+For local development with automatic reloads:
+
+```bash
+npm run dev
+```
+
+## API Overview
+
+### `POST /upload`
+
+Multipart upload endpoint. Example using `curl`:
+
+```bash
+curl -F "file=@document.md" http://localhost:3000/upload
+```
+
+**Response**
+
+```json
+{
+  "message": "File uploaded successfully.",
+  "file": {
+    "originalName": "document.md",
+    "storedName": "1695662550000-1234abcd.md",
+    "mimeType": "text/markdown",
+    "size": 128,
+  "path": "d:/Projects/file_converter/storage/uploads/1695662550000-1234abcd.md"
+  }
+}
+```
+
+### `POST /convert`
+
+Submit a conversion task. The `sourcePath` should point to a file accessible by the service (e.g., the path returned from `/upload`).
+
+```bash
+curl -X POST http://localhost:3000/convert \
+  -H "Content-Type: application/json" \
+  -d '{
+  "sourcePath": "d:/Projects/file_converter/storage/uploads/1695662550000-1234abcd.md",
+        "sourceFormat": "markdown",
+        "targetFormat": "html"
+      }'
+```
+
+**Response**
+
+```json
+{
+  "message": "Conversion task created successfully.",
+  "task": {
+    "id": "a1b2c3d4",
+    "status": "pending",
+    "sourcePath": "...",
+    "createdAt": "2024-09-25T12:00:00.000Z"
+  }
+}
+```
+
+### `GET /tasks/:id`
+
+Fetch task status and, when complete, retrieve the download URL for the converted file.
+
+```bash
+curl http://localhost:3000/tasks/a1b2c3d4
+```
+
+**Response (completed task)**
+
+```json
+{
+  "task": {
+    "id": "a1b2c3d4",
+    "status": "completed",
+  "downloadUrl": "http://localhost:3000/download/a1b2c3d4",
+    "outputPath": "document-a1b2c3d4.html",
+    "updatedAt": "2024-09-25T12:00:10.000Z"
+  }
+}
+```
+
+### `GET /download/:id`
+
+Stream the converted file associated with a completed task directly to the caller.
+
+```bash
+curl -L -o output.html http://localhost:3000/download/a1b2c3d4
+```
+
+The response body is the file stream. HTTP 409 is returned if the task hasn't finished, and 404 if the task or its output cannot be found.
+
+## Testing
+
+Tests run against a simulated conversion (Pandoc is not invoked when `NODE_ENV=test`).
+
+```bash
+npm test
+```
+
+## Folder Structure
+
+```
+.
+├── storage/
+│   ├── converted/       # Target directory for converted files
+│   └── uploads/         # Storage for uploaded source files
+├── src/
+│   ├── app.ts           # Express app factory
+│   ├── index.ts         # Application entry point
+│   ├── config/
+│   ├── routes/
+│   └── services/
+└── tests/               # Automated tests
+```
+
+## Notes
+
+- Tasks are maintained in memory. Restarting the server clears the task registry.
+- Extend the `ConversionService` to persist tasks or integrate a job queue for production workloads.
