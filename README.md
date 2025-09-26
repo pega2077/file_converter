@@ -8,6 +8,7 @@ A lightweight file conversion service built with Node.js, TypeScript, and Expres
 - **Conversion task creation** (`POST /convert`) – Submits a conversion job using Pandoc given a source file path, source format, and target format.
 - **Task status lookup** (`GET /tasks/:id`) – Retrieves task metadata, including status, timestamps, and a download URL when the conversion succeeds.
 - **Task download** (`GET /download/:id`) – Streams the converted asset directly using the task ID once processing has finished.
+- **Formats listing** (`GET /formats`) – Returns the source/target formats that the service currently accepts.
 
 ## Prerequisites
 
@@ -112,6 +113,25 @@ curl -L -o output.html http://localhost:3000/download/a1b2c3d4
 ```
 
 The response body is the file stream. HTTP 409 is returned if the task hasn't finished, and 404 if the task or its output cannot be found.
+
+### `GET /formats`
+
+Retrieve the list of supported source and target formats.
+
+```bash
+curl http://localhost:3000/formats
+```
+
+**Response**
+
+```json
+{
+  "formats": {
+    "source": ["markdown", "html", "docx", "pdf"],
+    "target": ["markdown", "html", "docx", "pdf"]
+  }
+}
+```
 
 ## Testing
 

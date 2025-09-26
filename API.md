@@ -152,7 +152,26 @@ Streams the converted file associated with the given task ID. Returns HTTP 409 i
 curl -L -o sample.html http://localhost:3100/download/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
 ```
 
-### 5. Health Check *(optional)*
+### 5. List Supported Formats
+
+```
+GET /formats
+```
+
+Returns the currently supported source and target formats.
+
+**Sample Response**
+
+```json
+{
+  "formats": {
+    "source": ["markdown", "html", "docx", "pdf"],
+    "target": ["markdown", "html", "docx", "pdf"]
+  }
+}
+```
+
+### 6. Health Check *(optional)*
 
 ```
 GET /health

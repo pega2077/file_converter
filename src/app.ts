@@ -3,6 +3,7 @@ import express, { type Request, type Response } from 'express';
 import { CONVERTED_DIR, ensureStorageDirectories } from './config/storage';
 import { createConversionRouter } from './routes/conversion';
 import { createDownloadRouter } from './routes/download';
+import { formatsRouter } from './routes/formats';
 import { createTaskRouter } from './routes/tasks';
 import { uploadRouter } from './routes/upload';
 import { ConversionService } from './services/conversionService';
@@ -34,6 +35,7 @@ export async function createApp(): Promise<AppContext> {
   app.use('/convert', createConversionRouter(conversionService));
   app.use('/tasks', createTaskRouter(taskManager));
   app.use('/download', createDownloadRouter(taskManager));
+  app.use('/formats', formatsRouter);
 
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok' });

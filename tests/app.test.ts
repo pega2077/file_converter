@@ -49,9 +49,9 @@ describe('File Converter Service', () => {
     expect(response.body.file.originalName).toBe('sample.md');
     expect(response.body.file.mimeType).toBeTruthy();
 
-  const savedRelativePath = response.body.file.path as string;
-  const savedAbsolutePath = path.resolve(STORAGE_ROOT, savedRelativePath);
-  expect(fs.existsSync(savedAbsolutePath)).toBe(true);
+    const savedRelativePath = response.body.file.path as string;
+    const savedAbsolutePath = path.resolve(STORAGE_ROOT, savedRelativePath);
+    expect(fs.existsSync(savedAbsolutePath)).toBe(true);
   });
 
   it('creates and completes a conversion task', async () => {
@@ -100,5 +100,14 @@ describe('File Converter Service', () => {
     expect(downloadUrl).toBeDefined();
     const finalDownloadUrl = downloadUrl as string;
     expect(finalDownloadUrl).toContain(`/download/${taskId}`);
+  });
+
+  it('returns supported formats', async () => {
+    const response = await request(app).get('/formats');
+
+    expect(response.status).toBe(200);
+    expect(response.body.formats.source).toContain('markdown');
+    expect(response.body.formats.source).toContain('pdf');
+    expect(response.body.formats.target).toContain('html');
   });
 });
