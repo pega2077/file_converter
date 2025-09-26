@@ -29,6 +29,27 @@ For local development with automatic reloads:
 npm run dev
 ```
 
+## Web UI (Browser)
+
+After the server starts, open the web interface in your browser:
+
+- Default address: http://localhost:3100/
+- Or: http://<HOST>:<PORT>/ (uses `HOST` and `PORT` env vars; defaults to `localhost:3100`)
+- If you set `PUBLIC_BASE_URL`, that public URL will also be printed in the console on startup.
+
+You should see a simple conversion page served from `public/index.html`.
+
+### How to use
+
+1) Click “选择文件” to upload the source file.
+2) Pick the source and target formats (the source format may auto-detect based on file extension).
+3) Click “开始转换”. The page will upload the file, create a task, and poll status.
+4) When finished, a “下载转换结果” button appears to download the converted file.
+
+Notes:
+- The page calls the same REST APIs (`/formats`, `/upload`, `/convert`, `/tasks/:id`, `/download/:id`).
+- The download link will use an absolute URL if `PUBLIC_BASE_URL` is configured.
+
 ## API Overview
 
 ### `POST /upload`
