@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>文件转换服务</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      background-color: #f5f5f5;
+      color: #1f1f1f;
+    }
+
+    body {
+      margin: 0;
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    main {
+      width: min(960px, 100%);
+      background: white;
+      border-radius: 16px;
+      padding: 2rem 2.5rem;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+    }
+
+    h1 {
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      margin-bottom: 0.25rem;
+    }
+
+    p.subtitle {
+      margin-top: 0;
+      color: #475569;
+    }
+
+    form {
+      display: grid;
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    fieldset {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    legend {
+      padding: 0 0.5rem;
+      font-weight: 600;
+    }
+
+    label {
+      font-weight: 500;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    input[type="file"],
+    select {
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid #cbd5f5;
+      font-size: 1rem;
+      background: #f8fafc;
+    }
+
+    button {
+      padding: 0.8rem 1.4rem;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #4f46e5, #2563eb);
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      justify-self: flex-start;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 30px rgba(37, 99, 235, 0.3);
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    #status {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      background-color: #eef2ff;
+      color: #1e1b4b;
+      display: none;
+      gap: 0.75rem;
+      flex-direction: column;
+    }
+
+    #status.active {
+      display: flex;
+    }
+
+    .status-title {
+      font-weight: 600;
+    }
+
+    .progress-log {
+      margin: 0.25rem 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .progress-log li::before {
+      content: "•";
+      margin-right: 0.6rem;
+      color: #6366f1;
+    }
+
+    #download-section {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      border-radius: 12px;
+      background: #ecfdf5;
+      color: #064e3b;
+      border: 1px solid #6ee7b7;
+    }
+
+    #download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.7rem 1.2rem;
+      border-radius: 10px;
+      background: #10b981;
+      color: white;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    #download-link::after {
+      content: "↧";
+      font-size: 1.2rem;
+    }
+
+    .error {
+      color: #be123c;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>在线文件转换</h1>
+    <p class="subtitle">上传文件，选择格式，即可通过本站 API 完成转换，并直接下载结果。</p>
+
+    <form id="conversion-form">
+      <fieldset>
+        <legend>1. 上传文件</legend>
+        <label>
+          选择文件
+          <input type="file" id="file-input" name="file" required>
+        </label>
+        <p id="selected-file" class="visually-hidden"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>2. 选择转换格式</legend>
+        <label>
+          源文件格式
+          <select id="source-format" name="sourceFormat" required>
+            <option value="" disabled selected>正在加载格式列表...</option>
+          </select>
+        </label>
+        <label>
+          目标文件格式
+          <select id="target-format" name="targetFormat" required>
+            <option value="" disabled selected>正在加载格式列表...</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <button type="submit" id="submit-btn">开始转换</button>
+    </form>
+
+    <section id="status" aria-live="polite">
+      <p class="status-title">状态更新</p>
+      <ul class="progress-log" id="progress-log"></ul>
+    </section>
+
+    <section id="download-section">
+      <h2>转换完成</h2>
+      <p>
+        任务 <span id="completed-task-id"></span> 已完成，您可以下载结果文件：
+      </p>
+      <a id="download-link" href="#" download>下载转换结果</a>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById('conversion-form');
+    const fileInput = document.getElementById('file-input');
+    const sourceSelect = document.getElementById('source-format');
+    const targetSelect = document.getElementById('target-format');
+    const submitBtn = document.getElementById('submit-btn');
+    const statusSection = document.getElementById('status');
+    const progressLog = document.getElementById('progress-log');
+    const downloadSection = document.getElementById('download-section');
+    const downloadLink = document.getElementById('download-link');
+    const completedTaskId = document.getElementById('completed-task-id');
+    const selectedFileText = document.getElementById('selected-file');
+
+    const POLL_INTERVAL = 2000;
+    const EXTENSION_TO_FORMAT = new Map([
+      ['docx', 'docx'],
+      ['pdf', 'pdf'],
+      ['html', 'html'],
+      ['htm', 'html'],
+      ['md', 'markdown'],
+      ['markdown', 'markdown'],
+      ['mkd', 'markdown'],
+      ['ipynb', 'ipynb'],
+      ['rst', 'rst'],
+      ['tex', 'latex'],
+      ['latex', 'latex'],
+      ['odt', 'odt'],
+      ['rtf', 'rtf'],
+      ['csv', 'csv'],
+      ['tsv', 'tsv'],
+      ['epub', 'epub'],
+      ['epub3', 'epub'],
+      ['json', 'json'],
+      ['xml', 'xml'],
+      ['org', 'org'],
+      ['djot', 'djot'],
+      ['docbook', 'docbook'],
+      ['gfm', 'gfm']
+    ]);
+
+  let availableSourceFormats = [];
+  let pendingAutoSelectExtension = null;
+  let lastFileSelection = null;
+
+    function setStatus(message, options = {}) {
+      statusSection.classList.add('active');
+      const li = document.createElement('li');
+      li.textContent = message;
+      if (options.error) {
+        li.classList.add('error');
+      }
+      progressLog.appendChild(li);
+      li.scrollIntoView({ block: 'nearest' });
+    }
+
+    function resetStatus() {
+      statusSection.classList.remove('active');
+      progressLog.innerHTML = '';
+    }
+
+    function setLoadingState(isLoading) {
+      submitBtn.disabled = isLoading;
+      fileInput.disabled = isLoading;
+      sourceSelect.disabled = isLoading;
+      targetSelect.disabled = isLoading;
+      if (isLoading) {
+        submitBtn.textContent = '正在转换...';
+      } else {
+        submitBtn.textContent = '开始转换';
+      }
+    }
+
+    async function fetchFormats() {
+      try {
+        const response = await fetch('/formats');
+        if (!response.ok) {
+          throw new Error('无法获取格式列表');
+        }
+        const data = await response.json();
+        const { source = [], target = [] } = data.formats ?? {};
+        availableSourceFormats = Array.isArray(source) ? [...source] : [];
+        populateSelect(sourceSelect, source, '选择源格式');
+        populateSelect(targetSelect, target, '选择目标格式');
+        if (pendingAutoSelectExtension) {
+          const extension = pendingAutoSelectExtension;
+          const matched = applyExtensionAutoSelect(extension);
+          if (matched && lastFileSelection) {
+            updateSelectedFileIndicator({
+              fileName: lastFileSelection.fileName,
+              extension,
+              matchedFormat: matched,
+              pending: false
+            });
+            pendingAutoSelectExtension = null;
+          }
+        }
+      } catch (error) {
+        availableSourceFormats = [];
+        populateSelect(sourceSelect, [], '加载失败');
+        populateSelect(targetSelect, [], '加载失败');
+        setStatus((error && error.message) || '加载格式列表出错', { error: true });
+      }
+    }
+
+    function populateSelect(select, items, placeholder) {
+      select.innerHTML = '';
+      const defaultOption = document.createElement('option');
+      defaultOption.textContent = placeholder;
+      defaultOption.disabled = true;
+      defaultOption.selected = true;
+      defaultOption.value = '';
+      select.appendChild(defaultOption);
+
+      for (const item of items) {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        select.appendChild(option);
+      }
+    }
+
+    function extractExtension(fileName) {
+      const lastDotIndex = fileName.lastIndexOf('.');
+      if (lastDotIndex === -1 || lastDotIndex === fileName.length - 1) {
+        return null;
+      }
+      return fileName.slice(lastDotIndex + 1).toLowerCase();
+    }
+
+    function applyExtensionAutoSelect(extension) {
+      if (!extension || availableSourceFormats.length === 0) {
+        return null;
+      }
+      const normalizedExtension = extension.toLowerCase();
+      const candidate = EXTENSION_TO_FORMAT.get(normalizedExtension) ?? normalizedExtension;
+      const matchedFormat = availableSourceFormats.find(
+        (format) => format.toLowerCase() === String(candidate).toLowerCase()
+      );
+      if (matchedFormat) {
+        sourceSelect.value = matchedFormat;
+        sourceSelect.dispatchEvent(new Event('change'));
+        return matchedFormat;
+      }
+      return null;
+    }
+
+    function autoSelectSourceFormat(file) {
+      const extension = extractExtension(file.name);
+      lastFileSelection = { fileName: file.name, extension };
+
+      if (!extension) {
+        pendingAutoSelectExtension = null;
+        return { extension: null, matchedFormat: null, pending: false };
+      }
+
+      const matchedFormat = applyExtensionAutoSelect(extension);
+      if (matchedFormat) {
+        pendingAutoSelectExtension = null;
+        return { extension, matchedFormat, pending: false };
+      }
+
+      const shouldWaitForFormats = availableSourceFormats.length === 0;
+      pendingAutoSelectExtension = shouldWaitForFormats ? extension : null;
+      return {
+        extension,
+        matchedFormat: null,
+        pending: shouldWaitForFormats
+      };
+    }
+
+    function updateSelectedFileIndicator({ fileName, matchedFormat, extension, pending }) {
+      if (!fileName) {
+        selectedFileText.classList.add('visually-hidden');
+        return;
+      }
+
+      let message = `已选择：${fileName}`;
+      if (matchedFormat) {
+        message += `（源格式已自动匹配为 ${matchedFormat}）`;
+      } else if (pending) {
+        message += '（等待格式列表加载后自动匹配）';
+      } else if (extension) {
+        message += '（未能自动匹配，请手动选择源格式）';
+      }
+
+      selectedFileText.textContent = message;
+      selectedFileText.classList.remove('visually-hidden');
+    }
+
+    async function handleFormSubmit(event) {
+      event.preventDefault();
+      resetStatus();
+      downloadSection.style.display = 'none';
+
+      const file = fileInput.files?.[0];
+      const sourceFormat = sourceSelect.value;
+      const targetFormat = targetSelect.value;
+
+      if (!file) {
+        setStatus('请先选择文件。', { error: true });
+        return;
+      }
+
+      if (!sourceFormat || !targetFormat) {
+        setStatus('请选择源格式和目标格式。', { error: true });
+        return;
+      }
+
+      setLoadingState(true);
+
+      try {
+        setStatus('正在上传文件...');
+        const uploadedFile = await uploadFile(file);
+
+        setStatus('创建转换任务...');
+        const task = await createConversionTask({
+          sourcePath: uploadedFile.file.path,
+          sourceFormat,
+          targetFormat,
+          sourceFilename: uploadedFile.file.originalName
+        });
+
+        setStatus(`任务已创建（ID: ${task.id}），正在处理...`);
+        const finalTask = await pollTaskStatus(task.id);
+
+        if (finalTask.status === 'completed') {
+          setStatus('转换完成，准备下载链接。');
+          const downloadUrl = finalTask.downloadUrl ?? `/download/${finalTask.id}`;
+          completedTaskId.textContent = finalTask.id;
+          downloadLink.href = downloadUrl;
+          downloadLink.download = `${finalTask.sourceFilename || 'converted-file'}.${targetFormat}`;
+          downloadSection.style.display = 'block';
+        } else {
+          setStatus(`任务失败：${finalTask.error ?? '未知错误'}`, { error: true });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '未知错误';
+        setStatus(`处理过程中出现错误：${message}`, { error: true });
+      } finally {
+        setLoadingState(false);
+      }
+    }
+
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorBody = await safeJson(response);
+        throw new Error(errorBody?.message ?? '文件上传失败');
+      }
+
+      const data = await response.json();
+      selectedFileText.textContent = `已上传：${data.file?.originalName ?? file.name}`;
+      selectedFileText.classList.remove('visually-hidden');
+      return data;
+    }
+
+    async function createConversionTask(payload) {
+      const response = await fetch('/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorBody = await safeJson(response);
+        throw new Error(errorBody?.message ?? '创建转换任务失败');
+      }
+
+      const data = await response.json();
+      return data.task;
+    }
+
+    async function pollTaskStatus(taskId) {
+      let attempts = 0;
+      while (true) {
+        attempts += 1;
+        const response = await fetch(`/tasks/${encodeURIComponent(taskId)}`);
+        if (!response.ok) {
+          const errorBody = await safeJson(response);
+          throw new Error(errorBody?.message ?? '查询任务状态失败');
+        }
+        const data = await response.json();
+        const task = data.task;
+
+        if (!task) {
+          throw new Error('任务信息缺失');
+        }
+
+        if (task.status === 'completed' || task.status === 'failed') {
+          return task;
+        }
+
+        setStatus(`第 ${attempts} 次轮询：任务状态为 ${task.status}，继续等待...`);
+        await wait(POLL_INTERVAL);
+      }
+    }
+
+    function wait(duration) {
+      return new Promise(resolve => setTimeout(resolve, duration));
+    }
+
+    async function safeJson(response) {
+      try {
+        return await response.json();
+      } catch (_error) {
+        return null;
+      }
+    }
+
+    form.addEventListener('submit', handleFormSubmit);
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (file) {
+        const { matchedFormat, extension, pending } = autoSelectSourceFormat(file);
+        updateSelectedFileIndicator({
+          fileName: file.name,
+          matchedFormat,
+          extension,
+          pending
+        });
+      } else {
+        lastFileSelection = null;
+        pendingAutoSelectExtension = null;
+        selectedFileText.textContent = '';
+        selectedFileText.classList.add('visually-hidden');
+      }
+    });
+
+    fetchFormats();
+  </script>
+</body>
+</html>

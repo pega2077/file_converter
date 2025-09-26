@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from 'express';
+import path from 'path';
 
 import { CONVERTED_DIR, ensureStorageDirectories } from './config/storage';
 import { createConversionRouter } from './routes/conversion';
@@ -28,6 +29,8 @@ export async function createApp(): Promise<AppContext> {
   console.log(`Using Pandoc executable at: ${conversionService['pandocPath']}`);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  const publicDir = path.resolve(process.cwd(), 'public');
+  app.use(express.static(publicDir));
 
   app.use('/downloads', express.static(CONVERTED_DIR));
 
