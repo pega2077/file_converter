@@ -7,6 +7,28 @@ import { TaskManager } from '../services/taskManager';
 export function createTaskRouter(taskManager: TaskManager): express.Router {
   const router = express.Router();
 
+  function buildDownloadUrl(req: Request, taskId: string): string | undefined {
+    const configuredBase = process.env.PUBLIC_BASE_URL;
+    const host = req.get('host');
+
+    const rawBase = configuredBase?.trim().length ? configuredBase.trim() : host;
+
+    if (!rawBase) {
+      return undefined;
+    }
+
+    const normalizedBase = /^https?:\/\//i.test(rawBase)
+      ? rawBase
+      : `https://${rawBase}`;
+
+    try {
+      const baseWithSlash = normalizedBase.endsWith('/') ? normalizedBase : `${normalizedBase}/`;
+      return new URL(`download/${encodeURIComponent(taskId)}`, baseWithSlash).toString();
+    } catch (_error) {
+      return undefined;
+    }
+  }
+
   router.get('/:taskId', (req: Request, res: Response) => {
     const { taskId } = req.params;
     const task = taskManager.getTask(taskId);
@@ -16,7 +38,7 @@ export function createTaskRouter(taskManager: TaskManager): express.Router {
     }
 
     const downloadUrl = task.status === 'completed' && task.outputPath
-      ? `${req.protocol}://${req.get('host')}/download/${task.id}`
+      ? buildDownloadUrl(req, task.id)
       : undefined;
 
     const relativeOutputPath = task.outputPath
