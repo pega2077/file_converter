@@ -39,6 +39,8 @@ After the server starts, open the web interface in your browser:
 
 You should see a simple conversion page served from `public/index.html`.
 
+![Web UI Preview](public/preview.png)
+
 ### How to use
 
 1) Click “选择文件” to upload the source file.
