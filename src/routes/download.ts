@@ -30,7 +30,7 @@ export function createDownloadRouter(taskManager: TaskManager): express.Router {
 
     const fileName = path.basename(filePath);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
 
     const readStream = fs.createReadStream(filePath);
     readStream.on('error', (error: NodeJS.ErrnoException) => {
