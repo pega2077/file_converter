@@ -6,6 +6,7 @@ import { extractText } from 'unpdf';
 
 import { ConversionTask } from '../types/task';
 import { CreateTaskPayload, TaskManager } from './taskManager';
+import { MarkitdownService } from './markitdownService';
 
 export interface ConversionRequest {
   sourceAbsolutePath: string;
@@ -18,6 +19,8 @@ export interface ConversionRequest {
 export interface ConversionServiceOptions {
   outputDirectory: string;
   pandocPath?: string;
+  markitdownPath?: string;
+  markitdownService?: MarkitdownService;
 }
 
 const DEFAULT_PANDOC_PATH = process.env.PANDOC_PATH || 'pandoc';
@@ -28,13 +31,25 @@ interface PreparedSource {
   cleanup: () => Promise<void>;
 }
 
+type ConversionStrategy = 'simulation' | 'markitdown' | 'pandoc';
+
 export class ConversionService {
   private readonly outputDirectory: string;
   private readonly pandocPath: string;
+  private readonly markitdownService: MarkitdownService;
 
   constructor(private readonly taskManager: TaskManager, options: ConversionServiceOptions) {
     this.outputDirectory = options.outputDirectory;
     this.pandocPath = options.pandocPath ?? DEFAULT_PANDOC_PATH;
+    this.markitdownService = options.markitdownService ?? new MarkitdownService({ executablePath: options.markitdownPath });
+  }
+
+  getPandocPath(): string {
+    return this.pandocPath;
+  }
+
+  getMarkitdownPath(): string {
+    return this.markitdownService.getExecutablePath();
   }
 
   async ensureDirectories(): Promise<void> {
@@ -65,14 +80,18 @@ export class ConversionService {
     const outputPath = path.join(this.outputDirectory, outputFilename);
 
     try {
-      const useSimulation = process.env.NODE_ENV === 'test';
-      const preparation = useSimulation
-        ? this.prepareSimulationSource(task)
-        : await this.prepareSourceForPandoc(task);
+      const strategy = this.resolveStrategy(task);
+      const preparation = await this.prepareSource(task, strategy);
 
       try {
-        if (useSimulation) {
-          await this.simulateConversion(task.sourcePath, outputPath);
+        if (strategy === 'simulation') {
+          await this.simulateConversion(preparation.sourcePath, outputPath);
+        } else if (strategy === 'markitdown') {
+          await this.markitdownService.convert({
+            sourcePath: preparation.sourcePath,
+            outputPath,
+            sourceFormat: task.sourceFormat
+          });
         } else {
           await this.runPandoc(task, outputPath, preparation.sourcePath, preparation.sourceFormat);
         }
@@ -87,7 +106,23 @@ export class ConversionService {
     }
   }
 
-  private prepareSimulationSource(task: ConversionTask): PreparedSource {
+  private resolveStrategy(task: ConversionTask): ConversionStrategy {
+    if (process.env.NODE_ENV === 'test') {
+      return 'simulation';
+    }
+
+    return this.shouldUseMarkitdown(task.targetFormat) ? 'markitdown' : 'pandoc';
+  }
+
+  private async prepareSource(task: ConversionTask, strategy: ConversionStrategy): Promise<PreparedSource> {
+    if (strategy === 'pandoc') {
+      return await this.prepareSourceForPandoc(task);
+    }
+
+    return this.preparePassThroughSource(task);
+  }
+
+  private preparePassThroughSource(task: ConversionTask): PreparedSource {
     return {
       sourcePath: task.sourcePath,
       sourceFormat: task.sourceFormat,
@@ -95,13 +130,14 @@ export class ConversionService {
     };
   }
 
+  private shouldUseMarkitdown(targetFormat: string): boolean {
+    const normalized = targetFormat.trim().toLowerCase();
+    return normalized === 'markdown' || normalized === 'md' || normalized === 'text';
+  }
+
   private async prepareSourceForPandoc(task: ConversionTask): Promise<PreparedSource> {
     if (task.sourceFormat.toLowerCase() !== 'pdf') {
-      return {
-        sourcePath: task.sourcePath,
-        sourceFormat: task.sourceFormat,
-        cleanup: async () => {}
-      };
+      return this.preparePassThroughSource(task);
     }
 
     const intermediatePath = this.buildIntermediateMarkdownPath(task.sourceFilename, task.id);
@@ -122,10 +158,10 @@ export class ConversionService {
   }
 
   private async convertPdfToMarkdown(inputPath: string, outputPath: string): Promise<void> {
-  const pdfBuffer: Buffer = await fs.promises.readFile(inputPath);
-  const binaryData = new Uint8Array(pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength));
-  const { text } = await extractText(binaryData, { mergePages: true });
-  const markdownContent = Array.isArray(text) ? text.join('\n\n') : text;
+    const pdfBuffer: Buffer = await fs.promises.readFile(inputPath);
+    const binaryData = new Uint8Array(pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength));
+    const { text } = await extractText(binaryData, { mergePages: true });
+    const markdownContent = Array.isArray(text) ? text.join('\n\n') : text;
     await fs.promises.writeFile(outputPath, markdownContent, 'utf8');
   }
 
@@ -136,7 +172,19 @@ export class ConversionService {
   }
 
   private normalizeExtension(format: string): string {
-    return format.replace(/^\./, '');
+    const normalized = format.replace(/^\./, '').toLowerCase();
+
+    switch (normalized) {
+      case 'markdown':
+      case 'md':
+        return 'md';
+      case 'text':
+      case 'txt':
+      case 'plain':
+        return 'txt';
+      default:
+        return normalized;
+    }
   }
 
   private async simulateConversion(sourcePath: string, outputPath: string): Promise<void> {

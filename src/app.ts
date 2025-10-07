@@ -23,10 +23,12 @@ export async function createApp(): Promise<AppContext> {
   const taskManager = new TaskManager();
   const conversionService = new ConversionService(taskManager, {
     outputDirectory: CONVERTED_DIR,
-    pandocPath: process.env.PANDOC_PATH
+    pandocPath: process.env.PANDOC_PATH,
+    markitdownPath: process.env.MARKITDOWN_PATH
   });
   console.log(`Using output directory: ${CONVERTED_DIR}`);
-  console.log(`Using Pandoc executable at: ${conversionService['pandocPath']}`);
+  console.log(`Using Pandoc executable at: ${conversionService.getPandocPath()}`);
+  console.log(`Using Markitdown executable at: ${conversionService.getMarkitdownPath()}`);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   const publicDir = path.resolve(process.cwd(), 'public');

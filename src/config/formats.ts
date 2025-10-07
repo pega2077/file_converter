@@ -12,6 +12,8 @@ export const SUPPORTED_SOURCE_FORMATS = [
   'djot',
   'docbook',
   'docx',
+  'doc',
+  'txt',
   'dokuwiki',
   'endnotexml',
   'epub',
@@ -75,6 +77,7 @@ export const SUPPORTED_TARGET_FORMATS = [
   'docbook4',
   'docbook5',
   'docx',
+  'doc',
   'dokuwiki',
   'dzslides',
   'epub',
@@ -112,6 +115,7 @@ export const SUPPORTED_TARGET_FORMATS = [
   'org',
   'pdf',
   'plain',
+  'text',
   'pptx',
   'revealjs',
   'rst',
@@ -130,3 +134,4 @@ export const SUPPORTED_TARGET_FORMATS = [
 
 export type SupportedSourceFormat = typeof SUPPORTED_SOURCE_FORMATS[number];
 export type SupportedTargetFormat = typeof SUPPORTED_TARGET_FORMATS[number];
+
