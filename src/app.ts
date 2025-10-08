@@ -24,11 +24,14 @@ export async function createApp(): Promise<AppContext> {
   const conversionService = new ConversionService(taskManager, {
     outputDirectory: CONVERTED_DIR,
     pandocPath: process.env.PANDOC_PATH,
-    markitdownPath: process.env.MARKITDOWN_PATH
+    markitdownPath: process.env.MARKITDOWN_PATH,
+    sofficePath: process.env.SOFFICE_PATH
   });
   console.log(`Using output directory: ${CONVERTED_DIR}`);
   console.log(`Using Pandoc executable at: ${conversionService.getPandocPath()}`);
   console.log(`Using Markitdown executable at: ${conversionService.getMarkitdownPath()}`);
+  const sofficePath = conversionService.getSofficePath();
+  console.log(`Using LibreOffice soffice executable at: ${sofficePath ?? 'not configured'}`);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   const publicDir = path.resolve(process.cwd(), 'public');

@@ -21,9 +21,11 @@ export interface ConversionServiceOptions {
   pandocPath?: string;
   markitdownPath?: string;
   markitdownService?: MarkitdownService;
+  sofficePath?: string;
 }
 
 const DEFAULT_PANDOC_PATH = process.env.PANDOC_PATH || 'pandoc';
+const DEFAULT_SOFFICE_PATH = 'C:\\Program Files\\LibreOffice\\program\\soffice.exe';
 
 interface PreparedSource {
   sourcePath: string;
@@ -37,11 +39,15 @@ export class ConversionService {
   private readonly outputDirectory: string;
   private readonly pandocPath: string;
   private readonly markitdownService: MarkitdownService;
+  private readonly sofficePath?: string;
+  private sofficeAvailability?: boolean;
 
   constructor(private readonly taskManager: TaskManager, options: ConversionServiceOptions) {
     this.outputDirectory = options.outputDirectory;
     this.pandocPath = options.pandocPath ?? DEFAULT_PANDOC_PATH;
     this.markitdownService = options.markitdownService ?? new MarkitdownService({ executablePath: options.markitdownPath });
+    const configuredSoffice = options.sofficePath ?? process.env.SOFFICE_PATH ?? DEFAULT_SOFFICE_PATH;
+    this.sofficePath = configuredSoffice?.trim() ? configuredSoffice : undefined;
   }
 
   getPandocPath(): string {
@@ -50,6 +56,10 @@ export class ConversionService {
 
   getMarkitdownPath(): string {
     return this.markitdownService.getExecutablePath();
+  }
+
+  getSofficePath(): string | undefined {
+    return this.sofficePath;
   }
 
   async ensureDirectories(): Promise<void> {
@@ -80,23 +90,34 @@ export class ConversionService {
     const outputPath = path.join(this.outputDirectory, outputFilename);
 
     try {
-      const strategy = this.resolveStrategy(task);
-      const preparation = await this.prepareSource(task, strategy);
+      const legacyPreparation = await this.prepareLegacyOfficeSource(task);
+      const effectiveTask: ConversionTask = {
+        ...task,
+        sourcePath: legacyPreparation.sourcePath,
+        sourceFormat: legacyPreparation.sourceFormat
+      };
 
       try {
-        if (strategy === 'simulation') {
-          await this.simulateConversion(preparation.sourcePath, outputPath);
-        } else if (strategy === 'markitdown') {
-          await this.markitdownService.convert({
-            sourcePath: preparation.sourcePath,
-            outputPath,
-            sourceFormat: task.sourceFormat
-          });
-        } else {
-          await this.runPandoc(task, outputPath, preparation.sourcePath, preparation.sourceFormat);
+        const strategy = this.resolveStrategy(effectiveTask);
+        const preparation = await this.prepareSource(effectiveTask, strategy);
+
+        try {
+          if (strategy === 'simulation') {
+            await this.simulateConversion(preparation.sourcePath, outputPath);
+          } else if (strategy === 'markitdown') {
+            await this.markitdownService.convert({
+              sourcePath: preparation.sourcePath,
+              outputPath,
+              sourceFormat: preparation.sourceFormat
+            });
+          } else {
+            await this.runPandoc(effectiveTask, outputPath, preparation.sourcePath, preparation.sourceFormat);
+          }
+        } finally {
+          await preparation.cleanup();
         }
       } finally {
-        await preparation.cleanup();
+        await legacyPreparation.cleanup();
       }
 
       this.taskManager.attachResult(task.id, outputPath);
@@ -122,12 +143,124 @@ export class ConversionService {
     return this.preparePassThroughSource(task);
   }
 
+  private async prepareLegacyOfficeSource(task: ConversionTask): Promise<PreparedSource> {
+    const mapping = this.getLegacyOfficeMapping(task.sourceFormat);
+    if (!mapping) {
+      return this.preparePassThroughSource(task);
+    }
+
+    const sofficePath = this.sofficePath;
+    if (!sofficePath) {
+      return this.preparePassThroughSource(task);
+    }
+
+    const available = await this.isSofficeAvailable(sofficePath);
+    if (!available) {
+      return this.preparePassThroughSource(task);
+    }
+
+    const tempDir = await fs.promises.mkdtemp(path.join(this.outputDirectory, 'soffice-'));
+
+    try {
+      const args = [
+        '--headless',
+        '--convert-to',
+        mapping.targetExtension,
+        task.sourcePath,
+        '--outdir',
+        tempDir
+      ];
+
+      await this.spawnLibreOffice(sofficePath, args);
+
+      const convertedFiles = await fs.promises.readdir(tempDir);
+      const lowerSuffix = `.${mapping.targetExtension}`;
+      const convertedFile = convertedFiles.find((file) => file.toLowerCase().endsWith(lowerSuffix));
+
+      if (!convertedFile) {
+        throw new Error(`LibreOffice conversion completed without producing a "${mapping.targetExtension}" output.`);
+      }
+
+      const convertedPath = path.join(tempDir, convertedFile);
+
+      return {
+        sourcePath: convertedPath,
+        sourceFormat: mapping.targetExtension,
+        cleanup: async () => {
+          await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+        }
+      };
+    } catch (error) {
+      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+      throw error;
+    }
+  }
+
   private preparePassThroughSource(task: ConversionTask): PreparedSource {
     return {
       sourcePath: task.sourcePath,
       sourceFormat: task.sourceFormat,
       cleanup: async () => {}
     };
+  }
+
+  private getLegacyOfficeMapping(format: string): { targetExtension: string } | undefined {
+    const normalized = format.trim().toLowerCase();
+
+    switch (normalized) {
+      case 'doc':
+        return { targetExtension: 'docx' };
+      case 'ppt':
+        return { targetExtension: 'pptx' };
+      case 'xls':
+        return { targetExtension: 'xlsx' };
+      default:
+        return undefined;
+    }
+  }
+
+  private async isSofficeAvailable(sofficePath: string): Promise<boolean> {
+    if (this.sofficeAvailability !== undefined) {
+      return this.sofficeAvailability;
+    }
+
+    try {
+      await fs.promises.access(sofficePath, fs.constants.F_OK);
+      this.sofficeAvailability = true;
+    } catch {
+      this.sofficeAvailability = false;
+    }
+
+    return this.sofficeAvailability;
+  }
+
+  private spawnLibreOffice(executable: string, args: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const libProcess = spawn(executable, args);
+
+      let stderr = '';
+      libProcess.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+
+      libProcess.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') {
+          reject(new Error(`LibreOffice executable not found at "${executable}".`));
+          return;
+        }
+
+        reject(error);
+      });
+
+      libProcess.on('close', (code: number | null) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          const message = stderr.trim() || `LibreOffice exited with code ${code}`;
+          reject(new Error(message));
+        }
+      });
+    });
   }
 
   private shouldUseMarkitdown(targetFormat: string): boolean {
