@@ -100,7 +100,60 @@ curl -X POST http://localhost:3100/convert \
 }
 ```
 
-### 3. Query Task Status
+### 3. Synchronous Conversion
+
+```
+POST /convert/sync
+Content-Type: multipart/form-data
+Field: file (required)
+```
+
+Uploads a document and blocks until the conversion finishes. The service stores the uploaded file under `storage/uploads/`, performs the same conversion pipeline used by background tasks, and returns the completed task payload. When `sourceFormat` is omitted, the service attempts to derive it from the uploaded filename.
+
+**Sample Request**
+
+```bash
+curl -X POST http://localhost:3100/convert/sync \
+  -F "file=@/absolute/path/to/sample.doc" \
+  -F "targetFormat=pdf"
+```
+
+**Successful Response (200)**
+
+```json
+{
+  "message": "Conversion completed successfully.",
+  "task": {
+    "id": "6b84b7a6-23d7-4a90-8f97-49381a073a59",
+    "status": "completed",
+    "sourcePath": "uploads/1695662550000-6b84b7a6-23d7-4a90-8f97-49381a073a59.doc",
+    "sourceFormat": "doc",
+    "targetFormat": "pdf",
+    "sourceFilename": "sample.doc",
+    "outputPath": "sample-6b84b7a6-23d7-4a90-8f97-49381a073a59.pdf",
+    "downloadUrl": "http://localhost:3100/download/6b84b7a6-23d7-4a90-8f97-49381a073a59",
+    "createdAt": "2025-09-25T08:00:00.000Z",
+    "updatedAt": "2025-09-25T08:00:05.000Z"
+  }
+}
+```
+
+**Failure Response (500)**
+
+```json
+{
+  "message": "Conversion failed.",
+  "task": {
+    "id": "6b84b7a6-23d7-4a90-8f97-49381a073a59",
+    "status": "failed",
+    "error": "Pandoc exited with code 1",
+    "createdAt": "2025-09-25T08:00:00.000Z",
+    "updatedAt": "2025-09-25T08:00:05.000Z"
+  }
+}
+```
+
+### 4. Query Task Status
 
 ```
 GET /tasks/{taskId}
@@ -138,7 +191,7 @@ curl http://localhost:3100/tasks/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
 
 - `404 Not Found` – Task ID does not exist.
 
-### 4. Download Converted File
+### 5. Download Converted File
 
 ```
 GET /download/{taskId}
@@ -152,7 +205,7 @@ Streams the converted file associated with the given task ID. Returns HTTP 409 i
 curl -L -o sample.html http://localhost:3100/download/1c3f4ff9-2c8c-4d22-9d47-3d72b95ce3f2
 ```
 
-### 5. List Supported Formats
+### 6. List Supported Formats
 
 ```
 GET /formats
@@ -171,7 +224,7 @@ Returns the currently supported source and target formats.
 }
 ```
 
-### 6. Health Check *(optional)*
+### 7. Health Check *(optional)*
 
 ```
 GET /health

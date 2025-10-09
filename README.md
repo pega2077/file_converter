@@ -4,11 +4,12 @@ A lightweight file conversion service built with Node.js, TypeScript, and Expres
 
 ## Features
 
-- **File upload** (`POST /upload`) – Accepts a multipart form upload (`file` field) and stores the file in `storage/uploads/`.
-- **Conversion task creation** (`POST /convert`) – Submits a conversion job using Pandoc given a source file path, source format, and target format.
-- **Task status lookup** (`GET /tasks/:id`) – Retrieves task metadata, including status, timestamps, and a download URL when the conversion succeeds.
-- **Task download** (`GET /download/:id`) – Streams the converted asset directly using the task ID once processing has finished.
-- **Formats listing** (`GET /formats`) – Returns the source/target formats that the service currently accepts.
+- **File upload** (POST /upload) - Accepts a multipart form upload (file field) and stores the file in storage/uploads/.
+- **Conversion task creation** (POST /convert) - Submits a conversion job using Pandoc given a source file path, source format, and target format.
+- **Synchronous conversion** (POST /convert/sync) - Receives a file upload, performs the conversion immediately, and returns the completed task details in the response.
+- **Task status lookup** (GET /tasks/:id) - Retrieves task metadata, including status, timestamps, and a download URL when the conversion succeeds.
+- **Task download** (GET /download/:id) - Streams the converted asset directly using the task ID once processing has finished.
+- **Formats listing** (GET /formats) - Returns the source/target formats that the service currently accepts.
 
 ## Prerequisites
 
@@ -105,6 +106,38 @@ curl -X POST http://localhost:3000/convert \
   }
 }
 ```
+
+### `POST /convert/sync`
+
+Perform a one-shot conversion. Upload the document and specify `targetFormat` (and optionally `sourceFormat` when the file extension is ambiguous). The route waits for the conversion to finish and returns the resulting task payload.
+
+```bash
+curl -X POST http://localhost:3000/convert/sync \
+  -F "file=@./document.doc" \
+  -F "targetFormat=pdf"
+```
+
+**Response (success)**
+
+```json
+{
+  "message": "Conversion completed successfully.",
+  "task": {
+    "id": "c3f29f12-56bc-4c35-9dd6-76b3e2f6f2d1",
+    "status": "completed",
+    "sourcePath": "uploads/1695662550000-sample.doc",
+    "sourceFormat": "doc",
+    "targetFormat": "pdf",
+    "sourceFilename": "document.doc",
+    "outputPath": "document-c3f29f12-56bc-4c35-9dd6-76b3e2f6f2d1.pdf",
+    "downloadUrl": "http://localhost:3000/download/c3f29f12-56bc-4c35-9dd6-76b3e2f6f2d1",
+    "createdAt": "2024-09-25T12:00:00.000Z",
+    "updatedAt": "2024-09-25T12:00:05.000Z"
+  }
+}
+```
+
+If the conversion fails, the endpoint responds with HTTP 500 and includes the task payload (status `failed`) alongside the error message.
 
 ### `GET /tasks/:id`
 

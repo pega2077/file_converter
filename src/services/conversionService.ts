@@ -83,6 +83,29 @@ export class ConversionService {
     return task;
   }
 
+  async convertSynchronously(request: ConversionRequest): Promise<ConversionTask> {
+    await this.ensureDirectories();
+
+    const taskId = this.generateTaskId();
+    const task = this.taskManager.createTask({
+      id: taskId,
+      sourcePath: request.sourceAbsolutePath,
+      sourceRelativePath: request.sourceRelativePath,
+      sourceFormat: request.sourceFormat,
+      targetFormat: request.targetFormat,
+      sourceFilename: request.sourceFilename
+    } satisfies CreateTaskPayload);
+
+    await this.processTask(task);
+
+    const finalTask = this.taskManager.getTask(taskId);
+    if (!finalTask) {
+      throw new Error('Task not found after synchronous processing.');
+    }
+
+    return finalTask;
+  }
+
   private async processTask(task: ConversionTask): Promise<void> {
     this.taskManager.setProcessing(task.id);
 
