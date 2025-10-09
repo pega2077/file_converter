@@ -288,7 +288,7 @@ export class ConversionService {
 
   private shouldUseMarkitdown(targetFormat: string): boolean {
     const normalized = targetFormat.trim().toLowerCase();
-    return normalized === 'markdown' || normalized === 'md' || normalized === 'text';
+    return normalized === 'markdown' || normalized === 'md';
   }
 
   private async prepareSourceForPandoc(task: ConversionTask): Promise<PreparedSource> {
@@ -351,11 +351,14 @@ export class ConversionService {
   }
 
   private runPandoc(task: ConversionTask, outputPath: string, sourcePath: string, sourceFormat: string): Promise<void> {
+    const normalizedSourceFormat = this.normalizeFormatForPandoc(sourceFormat);
+    const normalizedTargetFormat = this.normalizeFormatForPandoc(task.targetFormat);
+
     const args = [
       '--from',
-      sourceFormat,
+      normalizedSourceFormat,
       '--to',
-      task.targetFormat,
+      normalizedTargetFormat,
       sourcePath,
       '--output',
       outputPath
@@ -392,5 +395,23 @@ export class ConversionService {
 
   private generateTaskId(): string {
     return randomUUID();
+  }
+
+  private normalizeFormatForPandoc(format: string): string {
+    const normalized = format.trim().toLowerCase();
+
+    switch (normalized) {
+      case 'markdown':
+      case 'md':
+        return 'markdown';
+      case 'text':
+      case 'txt':
+      case 'plain':
+        return 'plain';
+      case 'htm':
+        return 'html';
+      default:
+        return normalized;
+    }
   }
 }
