@@ -188,6 +188,11 @@ npm test
 - When `sourceFormat` is `pdf`, the service extracts text content via `unpdf` and feeds it to Pandoc as Markdown before creating the requested output.
 - When `soffice` is available, legacy Office inputs (`doc`, `ppt`, `xls`) are first converted to `docx`/`pptx`/`xlsx` before running the requested downstream conversion.
 
+## Maintenance Scripts
+
+- `scripts/update-and-restart.ps1` — PowerShell helper for Windows hosts. Pulls the latest code, optionally reinstalls dependencies, rebuilds the project, and restarts the PM2 process (`pm2 startOrReload ecosystem.config.json --only file-converter-service --update-env`). Example: `.\scripts\update-and-restart.ps1 -Branch main`.
+- `scripts/update-and-restart.sh` — Bash helper for Linux hosts with matching options (`--branch`, `--install`, `--skip-build`). Example: `bash scripts/update-and-restart.sh --branch main --install`.
+
 ### Deployment checklist
 
 - **Install Pandoc on the target machine.** The service shells out to the `pandoc` executable for every conversion.
