@@ -287,8 +287,9 @@ export class ConversionService {
   }
 
   private shouldUseMarkitdown(targetFormat: string): boolean {
-    const normalized = targetFormat.trim().toLowerCase();
-    return normalized === 'markdown' || normalized === 'md';
+    // const normalized = targetFormat.trim().toLowerCase();
+    // return normalized === 'markdown' || normalized === 'md';
+    return false; // Temporarily disable Markitdown usage
   }
 
   private async prepareSourceForPandoc(task: ConversionTask): Promise<PreparedSource> {
